@@ -1,0 +1,96 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+// Users table
+model User {
+    id              String   @id @default(uuid())
+    firstName       String
+    lastName        String?
+    email           String   @unique
+    profileImage    String?
+    isEmailVerified Boolean  @default(false)
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    // Relations
+    refreshTokens RefreshToken[]
+    actionTokens  ActionToken[]
+    authProviders AuthProvider[]
+
+    @@map("users")
+}
+
+// Authentication related details
+model AuthProvider {
+    id                 String           @id @default(uuid())
+    userId             String
+    user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+    authProviderType   AuthProviderType
+    authProviderUserId String? // user ID provided by OAuth provider
+    password           String?
+    createdAt          DateTime         @default(now())
+    updatedAt          DateTime         @updatedAt
+
+    // Ensure unique provider per user and unique O'Auth accounts
+    @@unique([userId, authProviderType])
+    @@unique([authProviderType, authProviderUserId])
+    @@map("auth_providers")
+}
+
+// Refresh tokens table
+model RefreshToken {
+    id        String   @id @default(uuid())
+    token     String   @unique
+    userId    String
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+    revoked   Boolean  @default(false)
+    revokedAt DateTime? 
+    createdAt DateTime @default(now())
+
+    @@map("refresh_tokens")
+}
+
+// Tokens for Reset password and Email verification
+model ActionToken {
+    id        String     @id @default(uuid())
+    token     String     @unique
+    type      ActionType
+    userId    String
+    user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+    expiresAt DateTime
+    usedAt    DateTime?
+    createdAt DateTime   @default(now())
+
+    @@map("action_tokens")
+}
+
+model OAuthStateToken {
+    id String @id @default(uuid())
+    token String @unique
+    createdAt DateTime @default(now())
+
+    @@map("oauth_state_tokens")
+}
+
+enum ActionType {
+    EMAIL_VERIFICATION
+    PASSWORD_RESET
+    OAUTH_STATE
+}
+
+enum AuthProviderType {
+    EMAIL_PASSWORD
+    GOOGLE
+}
